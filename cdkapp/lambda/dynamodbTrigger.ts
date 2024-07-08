@@ -13,7 +13,6 @@ export const handler = async (event: any, context: Context) => {
 
   const record = event.Records[0];
   if (record.eventName !== 'INSERT') {
-    console.log('Ignoring non-INSERT events.');
     return { statusCode: 200, body: 'Only INSERT events are processed.' };
   }
 
@@ -37,7 +36,6 @@ export const handler = async (event: any, context: Context) => {
   # Associate the Elastic IP with the instance
   # Execute Python script with parameters
   python3 /tmp/script.py ${recordId} ${tableName} \${INSTANCE_ID}
-  # Terminate the instance
   `;
   const instanceParams: RunInstancesCommandInput = {
     ImageId: 'ami-0900fe555666598a2', // Replace with your desired AMI ID
@@ -54,15 +52,10 @@ export const handler = async (event: any, context: Context) => {
   };
 
   try {
-    console.log('Creating EC2 instance with the following parameters:', instanceParams);
-    console.log('EC2 role ARN:', EC2_ROLE_ARN);
     const data = await ec2Client.send(new RunInstancesCommand(instanceParams));
-    console.log('Instance creation response:', data);
-    console.log('ec2 role', EC2_ROLE_ARN)
     if (!data.Instances) {
       throw new Error('No instances created');
     }
-    console.log('Instance created:', data.Instances[0].InstanceId);
     return { statusCode: 200, body: 'EC2 instance created successfully!' };
   } catch (err) {
     console.error(err);

@@ -12,8 +12,6 @@ import { BucketDeployment, Source } from 'aws-cdk-lib/aws-s3-deployment';
 export class ApiStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
-    // Create an IAM role for the EC2 instance
-
     // S3 Bucket
     const bucket = new s3.Bucket(this, 'MyBucket', {
       removalPolicy: RemovalPolicy.DESTROY, // Remove this if you want to retain the bucket when the stack is deleted
@@ -71,22 +69,28 @@ export class ApiStack extends Stack {
     bucket.grantReadWrite(getsignedLambda);
     table.grantReadWriteData(getsignedLambda);
     table.grantReadWriteData(dataentry);
+    // Create an IAM role for the EC2 instance
 
     const ec2Role = new iam.Role(this, 'MyEC2Role', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
     });
     ec2Role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'));
     ec2Role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonDynamoDBFullAccess'));
-    ec2Role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess'));
+
+    // Add policy for EC2 termination
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['ec2:TerminateInstances'],
+      resources: ['*'],
+    }));
     // Create instance profile and associate with IAM role
     const instanceProfile = new iam.CfnInstanceProfile(this, 'MyEC2InstanceProfile', {
       roles: [ec2Role.roleName],
     });
     // Define Lambda function
-    const handler = new NodejsFunction(this, 'handlerhandler', {
+    const handler = new NodejsFunction(this, 'dynamodbTriggerLambda', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler', // Adjust handler based on your file structure
-      entry: 'lambda/read-new-record.ts',
+      entry: 'lambda/dynamodbTrigger.ts',
       environment: {
         TABLE_NAME: table.tableName,
         BUCKET_NAME: bucket.bucketName,
@@ -106,9 +110,9 @@ export class ApiStack extends Stack {
 
     // Create event source mapping to trigger Lambda on DynamoDB stream events
     handler.addEventSource(new lambdaEventSources.DynamoEventSource(table, {
-      batchSize: 10, // Number of records to process in each batch
-      startingPosition: lambda.StartingPosition.LATEST, // Starting position in the stream for the Lambda function to read
-      bisectBatchOnError: true, // Automatically split a batch on function error
+      batchSize: 10,
+      startingPosition: lambda.StartingPosition.LATEST,
+      bisectBatchOnError: true,
       retryAttempts: 10 // Number of times to retry when the function returns an error
     }));
 
@@ -131,6 +135,7 @@ export class ApiStack extends Stack {
 
     const postIntegration = new apigateway.LambdaIntegration(dataentry);
     api.root.addMethod('POST', postIntegration);
+
 
   }
 }
