@@ -1,4 +1,4 @@
-# Lovus Project Readme Documentation
+# Fovus Project Readme Documentation
 ## Dependencies
 
   for this project i have used the following aws services:-
